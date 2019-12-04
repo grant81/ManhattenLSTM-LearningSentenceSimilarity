@@ -4,12 +4,14 @@ import torch
 from hyperparameters import *
 import pandas as pd
 from nltk.corpus import stopwords
+import nltk
+nltk.download('stopwords')
 from sklearn.model_selection import train_test_split as split_data
 import numpy as np
 from gensim.models import KeyedVectors
 
 class QuoraDataset(torch.utils.data.Dataset):
-    def __init__(self, data_file, train_ratio=0.8, pretrained_embedding_path = EMBEDDING_PATH,max_len=None, vocab_limit=None,mode='train',switch2similar=False):
+    def __init__(self, data_file, train_ratio=0.8, pretrained_embedding_path=EMBEDDING_PATH, max_len=None, vocab_limit=None,mode='train',switch2similar=False):
         self.data_file = data_file
         self.train_ratio = train_ratio
         self.max_len = max_len
@@ -17,9 +19,12 @@ class QuoraDataset(torch.utils.data.Dataset):
         self.vocab_limit = vocab_limit
         self.mode = mode
         self.switch2similar = switch2similar
+        self.pretrained_embedding_path = pretrained_embedding_path
         self.score_col = 'is_duplicate'
         self.sequence_cols = ['question1', 'question2']
-        self.word2vec = KeyedVectors.load_word2vec_format(pretrained_embedding_path, binary=True)
+        self.word2vec = None
+        if switch2similar:
+            self.word2vec = KeyedVectors.load_word2vec_format(pretrained_embedding_path, binary=True)
         self.x_train = list()
         self.y_train = list()
         self.x_val = list()
@@ -39,7 +44,6 @@ class QuoraDataset(torch.utils.data.Dataset):
             return len(self.x_val)
 
     def __getitem__(self, idx):
-        #TODO sub
         if self.mode == 'train':
             return self.x_train[idx], self.y_train[idx]
 
@@ -91,7 +95,7 @@ class QuoraDataset(torch.utils.data.Dataset):
     def load_data(self):
         stops = set(stopwords.words('english'))
         #TODO should do test train split here
-        data_df = pd.read_csv(self.data_file, sep='\t')
+        data_df = pd.read_csv(self.data_file, sep=',')
 
         # Iterate over required sequences of provided dataset
         for index, row in data_df.iterrows():
@@ -198,11 +202,13 @@ class QuoraDataset(torch.utils.data.Dataset):
 
         self.convert_to_tensors()
 
-    def create_embedding_matrix(self,pretrained_embedding_path=EMBEDDING_PATH,embedding_size=EMBEDDING_SIZE):
-        self.word2vec = KeyedVectors.load_word2vec_format(pretrained_embedding_path, binary=True)
-        embedding_matrix = np.zeros((len(self.word2index)+1, embedding_size))
+    def create_embedding_matrix(self):
+        if not self.word2vec:
+            self.word2vec =  KeyedVectors.load_word2vec_format(self.pretrained_embedding_path, binary=True)
+        embedding_matrix = np.zeros((len(self.word2index)+1, EMBEDDING_SIZE))
         for word, i in self.word2index.items():
             if word not in self.word2vec.vocab:
                 continue
             embedding_matrix[i] = self.word2vec[word]
-        return embedding_matrix
+        self.word2vec = None
+        return torch.FloatTensor(embedding_matrix)

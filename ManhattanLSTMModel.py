@@ -10,7 +10,7 @@ class Manhattan_LSTM(nn.Module):
         self.hidden_size = hidden_size
         if use_embedding:
             self.embedding = nn.Embedding(embedding.shape[0], embedding.shape[1])
-            self.embedding.weight = nn.Parameter(embedding)
+            self.embedding.weight = nn.Parameter(embedding,requires_grad=train_embedding)
             self.input_size = embedding.shape[1]  # V - Size of embedding vector
 
         else:
@@ -61,6 +61,5 @@ class Manhattan_LSTM(nn.Module):
         result = torch.zeros(2, 1, batch_size, self.hidden_size)
 
         if self.use_cuda:
-            return result.cuda()
-        else:
-            return result
+            result = result.cuda()
+        return result[0], result[1]
