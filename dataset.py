@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split as split_data
 import numpy as np
 from gensim.models import KeyedVectors
 
+
 class QuoraDataset(torch.utils.data.Dataset):
     def __init__(self, data_file, train_ratio=0.8, pretrained_embedding_path=EMBEDDING_PATH, max_len=None, vocab_limit=None,mode='train',switch2similar=False):
         self.data_file = data_file
@@ -50,8 +51,14 @@ class QuoraDataset(torch.utils.data.Dataset):
         else:
             return self.x_val[idx], self.y_val[idx]
 
-    def switch_mode(self,mode):
-        self.mode = mode
+    # toggle between train mode and validate mode
+    def switch_mode(self):
+        if (self.mode == 'train'):
+            self.mode = 'validate'
+        else:
+            self.mode = 'train'
+
+
     def text_to_word_list(self, text):
         ''' Pre process and convert texts to a list of words '''
         text = str(text)
@@ -124,13 +131,15 @@ class QuoraDataset(torch.utils.data.Dataset):
                 data_df.at[index, sequence] = s2n
 
         return data_df
-    #very expensive
+    # very expensive
+
     def pick_similar_word(self, word, switch_prob=0.1):
         if random.random()<switch_prob:
             similar = self.word2vec.most_similar(word)
             return similar[0][0]
         else:
             return word
+
     def convert_to_tensors(self):
         for data in [self.x_train, self.x_val]:
             for i, pair in enumerate(data):
