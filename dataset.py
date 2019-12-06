@@ -25,6 +25,7 @@ class QuoraDataset(torch.utils.data.Dataset):
         self.score_col = 'is_duplicate'
         self.sequence_cols = ['question1', 'question2']
         self.word2vec = None
+
         if switch2similar:
             self.word2vec = KeyedVectors.load_word2vec_format(pretrained_embedding_path, binary=True)
         self.x_train = list()
@@ -102,7 +103,7 @@ class QuoraDataset(torch.utils.data.Dataset):
 
     def load_data(self):
         stops = set(stopwords.words('english'))
-        #TODO should do test train split here
+        # TODO should do test train split here, now both train and validation data goes into vocab
         data_df = pd.read_csv(self.data_file, sep=',')
 
         # Iterate over required sequences of provided dataset
@@ -114,7 +115,8 @@ class QuoraDataset(torch.utils.data.Dataset):
                     # Remove unwanted words
                     if word in stops:
                         continue
-                    #switch to a similar word according to word2vec
+                    # TODO: find a more efficient way of finding word with similar meaning
+                    # switch to a similar word according to word2vec (very very slow)
                     if self.switch2similar:
                         word = self.pick_similar_word(word)
                     if word not in self.vocab:

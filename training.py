@@ -29,9 +29,10 @@ model.train()
 
 total_loss = 0
 total_steps = len(training_data)//BATCH_SIZE
-for epoch in range(EPOCH_NUM):
+for epoch in range(1, EPOCH_NUM + 1):
     total_loss = 0
     step = 0
+    lr_scheduler.step()
     for questions, result in data_loader:
         step +=1
         question_1 = [question[0] for question in questions]
@@ -49,11 +50,12 @@ for epoch in range(EPOCH_NUM):
         optimizer.step()
 
         total_loss += loss
-        print('epoch: [{}], step: [{}/{}], curr_loss: [{:.4f}], average_loss: [{:.4f}]'
-              .format(epoch, step, total_steps,loss,total_loss/step))
-
-    torch.save(model.state_dict(),
-               f"output/model_epoch_{epoch}.model")
+        if step % 100 == 0:
+            print('epoch: [{}], step: [{}/{}], curr_loss: [{:.4f}], average_loss: [{:.4f}]'
+                  .format(epoch, step, total_steps, loss, total_loss / step))
+    if epoch % 5 == 0:
+        torch.save(model.state_dict(),
+                   f"output/model_epoch_{epoch}.model")
 #
 # if __name__ == '__main__':
 #     train_epoch()
