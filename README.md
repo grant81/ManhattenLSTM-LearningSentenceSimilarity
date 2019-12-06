@@ -10,3 +10,7 @@ install requirement by
 ```
 pip3 install -r requirement.txt
 ```
+
+preliminary result (for some wired reason if I change batch size, result varies)
+
+![alt text](prelim_result.png)
