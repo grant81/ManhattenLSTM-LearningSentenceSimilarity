@@ -39,4 +39,4 @@ for questions, ids in data_loader:
         else:
             answers.append([idx.item(), 1])
 result = pd.DataFrame(answers, columns=['test_id', 'is_duplicate'])
-result.to_csv(TEST_OUTPUT_PATH)
+result.to_csv(TEST_OUTPUT_PATH, index=False)

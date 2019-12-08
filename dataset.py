@@ -10,7 +10,7 @@ nltk.download('stopwords')
 from sklearn.model_selection import train_test_split as split_data
 import numpy as np
 from gensim.models import KeyedVectors
-
+from nltk.corpus import wordnet
 
 class QuoraDataset(torch.utils.data.Dataset):
     def __init__(self, data_file, train_ratio=0.8, test_path=TEST_PATH, pretrained_embedding_path=EMBEDDING_PATH,
@@ -27,9 +27,6 @@ class QuoraDataset(torch.utils.data.Dataset):
         self.score_col = 'is_duplicate'
         self.sequence_cols = ['question1', 'question2']
         self.word2vec = None
-
-        if switch2similar:
-            self.word2vec = KeyedVectors.load_word2vec_format(pretrained_embedding_path, binary=True)
         self.x_train = list()
         self.y_train = list()
         self.x_val = list()
@@ -142,12 +139,18 @@ class QuoraDataset(torch.utils.data.Dataset):
                         if word in stops:
                             continue
                         if word not in self.vocab:
-                            s2n.append(self.word2index['PAD'])
+                            self.vocab.add(word)
+                            self.word2index[word] = self.vocab_size
+                            self.word2count[word] = 1
+                            s2n.append(self.vocab_size)
+                            self.index2word[self.vocab_size] = word
+                            self.vocab_size += 1
                         else:
                             s2n.append(self.word2index[word])
 
                     # Replace |sequence as word| with |sequence as number| representation
                     data_df_test.at[index, sequence] = s2n
+            print('size of test set before {}'.format(len(data_df_test)))
             return data_df_test
         return data_df
     # very expensive
@@ -178,12 +181,11 @@ class QuoraDataset(torch.utils.data.Dataset):
 
     def convert_test_to_tensors(self):
         for data in self.x_test:
-            for i, pair in enumerate(data):
-                data[i][0] = torch.LongTensor(data[i][0])
-                data[i][1] = torch.LongTensor(data[i][1])
+            data[0] = torch.LongTensor(data[0])
+            data[1] = torch.LongTensor(data[1])
             if self.use_cuda:
-                data[i][0] = data[i][0].cuda()
-                data[i][1] = data[i][1].cuda()
+                data[0] = data[0].cuda()
+                data[1] = data[1].cuda()
 
     def generate_test_id(self):
         self.test_id = [i for i in range(len(self.x_test))]
@@ -194,11 +196,11 @@ class QuoraDataset(torch.utils.data.Dataset):
         if self.mode == 'test':
             self.x_test = data_df[self.sequence_cols]
             test_pairs = []
-            self.x_test = self.x_test.values
-            for row in self.x_test:
+            for index, row in self.x_test.iterrows():
                 sequence_1 = row[self.sequence_cols[0]]
                 sequence_2 = row[self.sequence_cols[1]]
-                if len(sequence_1) > 0 and len(sequence_2) > 0:
+                # if len(sequence_1) > 0 and len(sequence_2) > 0:
+                if True:
                     test_pairs.append([sequence_1, sequence_2])
             self.x_test = test_pairs
             print('Number of test samples: {}'.format(len(self.x_test)))

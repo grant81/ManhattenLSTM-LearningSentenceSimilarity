@@ -12,7 +12,7 @@ def my_collate(batch):
 
 use_cuda = torch.cuda.is_available()
 print('Reading Datafile')
-training_data = QuoraDataset(TRAIN_PATH)
+training_data = QuoraDataset(ADDITIONAL_TRAINING_PATH)
 data_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, collate_fn=my_collate)
 print('producing embedding matrix')
 embedding = training_data.create_embedding_matrix()
@@ -53,11 +53,11 @@ for epoch in range(1, EPOCH_NUM + 1):
 
         total_loss += loss
         if step % 100 == 0:
-            print('epoch: [{}], step: [{}/{}], curr_loss: [{:.4f}], average_loss: [{:.4f}]'
-                  .format(epoch, step, total_steps, loss, total_loss / step))
+            print('epoch: [{}], step: [{}/{}], LR: [{}], curr_loss: [{:.4f}], average_loss: [{:.4f}]'
+                  .format(epoch, step, lr_scheduler.get_lr(), total_steps, loss, total_loss / step))
     if epoch % 5 == 0:
         torch.save(model.state_dict(),
-                   f"output/model_epoch_{epoch + 30}.model")
+                   f"output/model_epoch_EXT_{epoch}.model")
 #
 # if __name__ == '__main__':
 #     train_epoch()

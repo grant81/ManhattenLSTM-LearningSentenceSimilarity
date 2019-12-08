@@ -8,3 +8,4 @@ LEARNING_RATE = 0.0001
 EPOCH_NUM = 30
 PRETRAINED_PATH = 'output/model_epoch_60.model'
 TEST_OUTPUT_PATH = 'output/submission.csv'
+ADDITIONAL_TRAINING_PATH = 'data/train_extend.csv'
