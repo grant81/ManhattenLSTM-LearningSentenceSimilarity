@@ -18,6 +18,8 @@ print('producing embedding matrix')
 embedding = training_data.create_embedding_matrix()
 print('building model')
 model = Manhattan_LSTM(HIDDEN_SIZE, embedding)
+model_state_dict = torch.load(PRETRAINED_PATH)
+model.load_state_dict(model_state_dict)
 if use_cuda:
     model = model.cuda()
 model.init_weights()
@@ -55,7 +57,7 @@ for epoch in range(1, EPOCH_NUM + 1):
                   .format(epoch, step, total_steps, loss, total_loss / step))
     if epoch % 5 == 0:
         torch.save(model.state_dict(),
-                   f"output/model_epoch_{epoch}.model")
+                   f"output/model_epoch_{epoch + 30}.model")
 #
 # if __name__ == '__main__':
 #     train_epoch()

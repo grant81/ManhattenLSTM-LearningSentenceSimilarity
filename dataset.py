@@ -13,8 +13,10 @@ from gensim.models import KeyedVectors
 
 
 class QuoraDataset(torch.utils.data.Dataset):
-    def __init__(self, data_file, train_ratio=0.8, pretrained_embedding_path=EMBEDDING_PATH, max_len=None, vocab_limit=None,mode='train',switch2similar=False):
+    def __init__(self, data_file, train_ratio=0.8, test_path=TEST_PATH, pretrained_embedding_path=EMBEDDING_PATH,
+                 max_len=None, vocab_limit=None, mode='train', switch2similar=False):
         self.data_file = data_file
+        self.test_data_file = test_path
         self.train_ratio = train_ratio
         self.max_len = max_len
         self.vocab_size = 1
@@ -32,6 +34,8 @@ class QuoraDataset(torch.utils.data.Dataset):
         self.y_train = list()
         self.x_val = list()
         self.y_val = list()
+        self.x_test = list()
+        self.test_id = list()
         self.vocab = set('PAD')
         self.word2index = {'PAD':0}
         self.index2word = {0:'PAD'}
@@ -43,22 +47,18 @@ class QuoraDataset(torch.utils.data.Dataset):
     def __len__(self):
         if self.mode == 'train':
             return len(self.x_train)
-        else:
+        elif self.mode == 'validate':
             return len(self.x_val)
+        else:
+            return len(self.x_test)
 
     def __getitem__(self, idx):
         if self.mode == 'train':
             return self.x_train[idx], self.y_train[idx]
-
-        else:
+        elif self.mode == 'validate':
             return self.x_val[idx], self.y_val[idx]
-
-    # toggle between train mode and validate mode
-    def switch_mode(self):
-        if (self.mode == 'train'):
-            self.mode = 'validate'
         else:
-            self.mode = 'train'
+            return self.x_test[idx], self.test_id[idx]
 
 
     def text_to_word_list(self, text):
@@ -105,7 +105,6 @@ class QuoraDataset(torch.utils.data.Dataset):
         stops = set(stopwords.words('english'))
         # TODO should do test train split here, now both train and validation data goes into vocab
         data_df = pd.read_csv(self.data_file, sep=',')
-
         # Iterate over required sequences of provided dataset
         for index, row in data_df.iterrows():
             # Iterate through the text of both questions of the row
@@ -132,7 +131,24 @@ class QuoraDataset(torch.utils.data.Dataset):
 
                 # Replace |sequence as word| with |sequence as number| representation
                 data_df.at[index, sequence] = s2n
+        if self.mode == 'test':
+            data_df_test = pd.read_csv(self.test_data_file, sep=',')
+            for index, row in data_df_test.iterrows():
+                # Iterate through the text of both questions of the row
+                for sequence in self.sequence_cols:
+                    s2n = []  # Sequences with words replaces with indices
+                    for word in self.text_to_word_list(row[sequence]):
+                        # Remove unwanted words
+                        if word in stops:
+                            continue
+                        if word not in self.vocab:
+                            s2n.append(self.word2index['PAD'])
+                        else:
+                            s2n.append(self.word2index[word])
 
+                    # Replace |sequence as word| with |sequence as number| representation
+                    data_df_test.at[index, sequence] = s2n
+            return data_df_test
         return data_df
     # very expensive
 
@@ -160,63 +176,87 @@ class QuoraDataset(torch.utils.data.Dataset):
             self.y_train = self.y_train.cuda()
             self.y_val = self.y_val.cuda()
 
+    def convert_test_to_tensors(self):
+        for data in self.x_test:
+            for i, pair in enumerate(data):
+                data[i][0] = torch.LongTensor(data[i][0])
+                data[i][1] = torch.LongTensor(data[i][1])
+            if self.use_cuda:
+                data[i][0] = data[i][0].cuda()
+                data[i][1] = data[i][1].cuda()
+
+    def generate_test_id(self):
+        self.test_id = [i for i in range(len(self.x_test))]
+        self.test_id = torch.IntTensor(self.test_id)
     def run(self):
         # Loading data and building vocabulary.
         data_df = self.load_data()
-        data_size = len(data_df)
+        if self.mode == 'test':
+            self.x_test = data_df[self.sequence_cols]
+            test_pairs = []
+            self.x_test = self.x_test.values
+            for row in self.x_test:
+                sequence_1 = row[self.sequence_cols[0]]
+                sequence_2 = row[self.sequence_cols[1]]
+                if len(sequence_1) > 0 and len(sequence_2) > 0:
+                    test_pairs.append([sequence_1, sequence_2])
+            self.x_test = test_pairs
+            print('Number of test samples: {}'.format(len(self.x_test)))
+            self.generate_test_id()
+            self.convert_test_to_tensors()
+        else:
+            X = data_df[self.sequence_cols]
+            Y = data_df[self.score_col]
 
-        X = data_df[self.sequence_cols]
-        Y = data_df[self.score_col]
+            self.x_train, self.x_val, self.y_train, self.y_val = split_data(X, Y, train_size=self.train_ratio)
 
-        self.x_train, self.x_val, self.y_train, self.y_val = split_data(X, Y, train_size=self.train_ratio)
+            # Convert labels to their numpy representations
+            self.y_train = self.y_train.values
+            self.y_val = self.y_val.values
 
-        # Convert labels to their numpy representations
-        self.y_train = self.y_train.values
-        self.y_val = self.y_val.values
+            training_pairs = []
+            training_scores = []
+            validation_pairs = []
+            validation_scores = []
 
-        training_pairs = []
-        training_scores = []
-        validation_pairs = []
-        validation_scores = []
+            # Split to lists
+            i = 0
+            for index, row in self.x_train.iterrows():
+                sequence_1 = row[self.sequence_cols[0]]
+                sequence_2 = row[self.sequence_cols[1]]
+                if len(sequence_1) > 0 and len(sequence_2) > 0:
+                    training_pairs.append([sequence_1, sequence_2])
+                    training_scores.append(float(self.y_train[i]))
+                i += 1
+            self.x_train = training_pairs
+            self.y_train = training_scores
 
-        # Split to lists
-        i = 0
-        for index, row in self.x_train.iterrows():
-            sequence_1 = row[self.sequence_cols[0]]
-            sequence_2 = row[self.sequence_cols[1]]
-            if len(sequence_1) > 0 and len(sequence_2) > 0:
-                training_pairs.append([sequence_1, sequence_2])
-                training_scores.append(float(self.y_train[i]))
-            i += 1
-        self.x_train = training_pairs
-        self.y_train = training_scores
+            print('Number of Training Positive Samples   :', sum(training_scores))
+            print('Number of Training Negative Samples   :', len(training_scores) - sum(training_scores))
 
-        print('Number of Training Positive Samples   :', sum(training_scores))
-        print('Number of Training Negative Samples   :', len(training_scores) - sum(training_scores))
+            i = 0
+            for index, row in self.x_val.iterrows():
+                sequence_1 = row[self.sequence_cols[0]]
+                sequence_2 = row[self.sequence_cols[1]]
+                if len(sequence_1) > 0 and len(sequence_2) > 0:
+                    validation_pairs.append([sequence_1, sequence_2])
+                    validation_scores.append(float(self.y_val[i]))
+                i += 1
 
-        i = 0
-        for index, row in self.x_val.iterrows():
-            sequence_1 = row[self.sequence_cols[0]]
-            sequence_2 = row[self.sequence_cols[1]]
-            if len(sequence_1) > 0 and len(sequence_2) > 0:
-                validation_pairs.append([sequence_1, sequence_2])
-                validation_scores.append(float(self.y_val[i]))
-            i += 1
+            self.x_val = validation_pairs
+            self.y_val = validation_scores
 
-        self.x_val = validation_pairs
-        self.y_val = validation_scores
+            print('Number of Validation Positive Samples   :', sum(validation_scores))
+            print('Number of Validation Negative Samples   :', len(validation_scores) - sum(validation_scores))
 
-        print('Number of Validation Positive Samples   :', sum(validation_scores))
-        print('Number of Validation Negative Samples   :', len(validation_scores) - sum(validation_scores))
+            assert len(self.x_train) == len(self.y_train)
+            assert len(self.x_val) == len(self.y_val)
 
-        assert len(self.x_train) == len(self.y_train)
-        assert len(self.x_val) == len(self.y_val)
-
-        self.convert_to_tensors()
+            self.convert_to_tensors()
 
     def create_embedding_matrix(self):
         if not self.word2vec:
-            self.word2vec =  KeyedVectors.load_word2vec_format(self.pretrained_embedding_path, binary=True)
+            self.word2vec = KeyedVectors.load_word2vec_format(self.pretrained_embedding_path, binary=True)
         embedding_matrix = np.zeros((len(self.word2index)+1, EMBEDDING_SIZE))
         for word, i in self.word2index.items():
             if word not in self.word2vec.vocab:
