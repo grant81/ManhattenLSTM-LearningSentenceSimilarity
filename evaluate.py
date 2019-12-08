@@ -33,6 +33,7 @@ model = Manhattan_LSTM(HIDDEN_SIZE, embedding)
 model_state_dict = torch.load(PRETRAINED_PATH)
 model.load_state_dict(model_state_dict)
 if use_cuda:
+    print('Using GPU')
     model = model.cuda()
 model.eval()
 loss_fn = nn.MSELoss()
