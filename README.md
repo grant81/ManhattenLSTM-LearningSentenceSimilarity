@@ -1,15 +1,12 @@
-*Based on implementation by [fionn-mac](https://github.com/fionn-mac/Manhattan-LSTM)*
+Based on the paper Siamese Recurrent Architectures for Learning Sentence Similarity by Jonas Mueller and Aditya Thyagarajan
 
 Download pretrained word2vec model from [here](https://drive.google.com/uc?id=0B7XkCwpI5KDYNlNUTTlSS21pQmM&export=download)
 
 Download Quera Dataset [here](https://www.kaggle.com/c/quora-question-pairs/data)
 
-Trained model download [link](https://drive.google.com/open?id=1wRfQhW15rXHzTc70ZcmregAIz5DL1slF)
+Trained models with different configurations can be downloaded [here](https://drive.google.com/open?id=1suscHM-xF7w4KFwvZLUEsHEu8tUSo8-f)
 
-**TODOs are up for grab, please take them**
-
-1. missing generate result file on the test set, after we have that we can upload to kaggle to see performance.
-2. many more in scripts
+the data and word2vec model should be put into data directory and the pretrained models should be put into output directory
 
 install requirement by
 ```
@@ -23,8 +20,5 @@ run the line below to test on validate set
 ```
 python3 evaluate.py
 ```
-modify hyperparameters.py to change stuff
+modify hyperparameters.py to change hyperparameters and select pretrained model
 
-preliminary result (for some wired reason if I change batch size, result varies)
-
-![alt text](prelim_result.png)
