@@ -110,7 +110,6 @@ class QuoraDataset(torch.utils.data.Dataset):
 
     def load_data(self):
         stops = set(stopwords.words('english'))
-        # TODO should do test train split here, now both train and validation data goes into vocab
         data_df = pd.read_csv(self.data_file, sep=',')
         # Iterate over required sequences of provided dataset
         for index, row in data_df.iterrows():
