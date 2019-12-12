@@ -4,22 +4,23 @@ from hyperparameters import *
 from ManhattanLSTMModel import Manhattan_LSTM
 from dataset import QuoraDataset
 import torch.nn.utils.rnn as rnn
-
+def printConfig():
+    print(f'Normalizer: {NORMALIZER}, StopWord: {USE_STOP_WORD}, Dataset: {TRAIN_PATH}, TrainingModelName: {TRAIN_MODEL_NAME}, PretrainedModelName: {PRETRAINED_PATH}')
 def my_collate(batch):
     data = [item[0] for item in batch]
     result = torch.stack([item[1] for item in batch])
     return [data, result]
-
+printConfig()
 use_cuda = torch.cuda.is_available()
 print('Reading Datafile')
-training_data = QuoraDataset(ADDITIONAL_TRAINING_PATH)
+training_data = QuoraDataset(TRAIN_PATH)
 data_loader = torch.utils.data.DataLoader(training_data, batch_size=BATCH_SIZE, shuffle=True, collate_fn=my_collate)
 print('producing embedding matrix')
 embedding = training_data.create_embedding_matrix()
 print('building model')
 model = Manhattan_LSTM(HIDDEN_SIZE, embedding)
-model_state_dict = torch.load(PRETRAINED_PATH)
-model.load_state_dict(model_state_dict)
+# model_state_dict = torch.load(PRETRAINED_PATH)
+# model.load_state_dict(model_state_dict)
 if use_cuda:
     model = model.cuda()
 model.init_weights()
@@ -54,10 +55,10 @@ for epoch in range(1, EPOCH_NUM + 1):
         total_loss += loss
         if step % 100 == 0:
             print('epoch: [{}], step: [{}/{}], LR: [{}], curr_loss: [{:.4f}], average_loss: [{:.4f}]'
-                  .format(epoch, step, lr_scheduler.get_lr(), total_steps, loss, total_loss / step))
-    if epoch % 5 == 0:
+                  .format(epoch, step,  total_steps, lr_scheduler.get_lr(), loss, total_loss / step))
+    if epoch % 10 == 0:
         torch.save(model.state_dict(),
-                   f"output/model_epoch_EXT_{epoch}.model")
+                   f"output/{TRAIN_MODEL_NAME}_epoch_{epoch}.model")
 #
 # if __name__ == '__main__':
 #     train_epoch()

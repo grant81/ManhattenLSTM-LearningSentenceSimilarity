@@ -10,19 +10,21 @@ nltk.download('stopwords')
 from sklearn.model_selection import train_test_split as split_data
 import numpy as np
 from gensim.models import KeyedVectors
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+import nltk.stem as stem
 from nltk.corpus import wordnet
+nltk.download('punkt')
+nltk.download('wordnet')
 
 class QuoraDataset(torch.utils.data.Dataset):
     def __init__(self, data_file, train_ratio=0.8, test_path=TEST_PATH, pretrained_embedding_path=EMBEDDING_PATH,
-                 max_len=None, vocab_limit=None, mode='train', switch2similar=False):
+                 mode='train', normalizer=NORMALIZER):
         self.data_file = data_file
         self.test_data_file = test_path
         self.train_ratio = train_ratio
-        self.max_len = max_len
         self.vocab_size = 1
-        self.vocab_limit = vocab_limit
         self.mode = mode
-        self.switch2similar = switch2similar
         self.pretrained_embedding_path = pretrained_embedding_path
         self.score_col = 'is_duplicate'
         self.sequence_cols = ['question1', 'question2']
@@ -37,7 +39,8 @@ class QuoraDataset(torch.utils.data.Dataset):
         self.word2index = {'PAD':0}
         self.index2word = {0:'PAD'}
         self.word2count = dict()
-
+        self.normalizer = normalizer
+        self.use_stop_word = USE_STOP_WORD
         self.use_cuda = torch.cuda.is_available()
         self.run()
 
@@ -62,8 +65,6 @@ class QuoraDataset(torch.utils.data.Dataset):
         ''' Pre process and convert texts to a list of words '''
         text = str(text)
         text = text.lower()
-
-        # Clean the text
         text = sub(r"[^A-Za-z0-9^,!.\/'+-=]", " ", text)
         text = sub(r"what's", "what is ", text)
         text = sub(r"\'s", " ", text)
@@ -93,10 +94,19 @@ class QuoraDataset(torch.utils.data.Dataset):
         text = sub(r"e - mail", "email", text)
         text = sub(r"j k", "jk", text)
         text = sub(r"\s{2,}", " ", text)
+        text = word_tokenize(text)
+        normalized_sentence = []
+        lancaster = stem.LancasterStemmer()
+        lemmatizer = WordNetLemmatizer()
 
-        text = text.split()
-
-        return text
+        for word in text:
+            if self.normalizer == 'lancaster':
+                normalized_sentence.append(lancaster.stem(word))
+            elif self.normalizer == 'wordnet':
+                normalized_sentence.append(lemmatizer.lemmatize(word))
+            else:
+                normalized_sentence.append(word)
+        return normalized_sentence
 
     def load_data(self):
         stops = set(stopwords.words('english'))
@@ -109,12 +119,8 @@ class QuoraDataset(torch.utils.data.Dataset):
                 s2n = []  # Sequences with words replaces with indices
                 for word in self.text_to_word_list(row[sequence]):
                     # Remove unwanted words
-                    if word in stops:
+                    if self.use_stop_word and word in stops:
                         continue
-                    # TODO: find a more efficient way of finding word with similar meaning
-                    # switch to a similar word according to word2vec (very very slow)
-                    if self.switch2similar:
-                        word = self.pick_similar_word(word)
                     if word not in self.vocab:
                         self.vocab.add(word)
                         self.word2index[word] = self.vocab_size

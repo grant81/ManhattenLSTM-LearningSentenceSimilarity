@@ -5,10 +5,15 @@ from ManhattanLSTMModel import Manhattan_LSTM
 from dataset import QuoraDataset
 import torch.nn.utils.rnn as rnn
 
+def printConfig():
+    print(f'Normalizer: {NORMALIZER}, StopWord: {USE_STOP_WORD}, Dataset: {TRAIN_PATH}, TrainingModelName: {TRAIN_MODEL_NAME}, PretrainedModelName: {PRETRAINED_PATH}')
 def my_collate(batch):
     data = [item[0] for item in batch]
     result = torch.stack([item[1] for item in batch])
     return [data, result]
+
+print(f'Evaluating {PRETRAINED_PATH}')
+printConfig()
 
 
 true_positive = 0
